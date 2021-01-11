@@ -145,12 +145,28 @@ public class RNSyanImagePickerModule extends ReactContextBaseJavaModule {
         this.mPickerCallback = callback;
         this.openVideo();
     }
+    
+     @ReactMethod
+    public void asyncOpenVideo(ReadableMap options, Promise promise) {
+        this.cameraOptions = options;
+        this.mPickerCallback = null;
+        this.mPickerPromise = promise;
+        this.openVideo();
+    }
 
     @ReactMethod
     public void openVideoPicker(ReadableMap options, Callback callback) {
         this.cameraOptions = options;
         this.mPickerPromise = null;
         this.mPickerCallback = callback;
+        this.openVideoPicker();
+    }
+    
+     @ReactMethod
+    public void asyncOpenVideoPicker(ReadableMap options, Promise promise) {
+        this.cameraOptions = options;
+        this.mPickerCallback = null;
+        this.mPickerPromise = promise;
         this.openVideoPicker();
     }
 
