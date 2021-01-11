@@ -2,12 +2,20 @@
 package com.syanpicker;
 
 import android.app.Activity;
+import android.content.ContentResolver;
 import android.content.Intent;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.MediaMetadataRetriever;
+import android.net.Uri;
+import android.os.Build;
+import android.os.FileUtils;
+import android.provider.OpenableColumns;
 import android.text.TextUtils;
 import android.util.Base64;
+
+import androidx.annotation.RequiresApi;
 
 import com.facebook.react.bridge.ActivityEventListener;
 import com.facebook.react.bridge.BaseActivityEventListener;
@@ -38,6 +46,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
 
 
 public class RNSyanImagePickerModule extends ReactContextBaseJavaModule {
