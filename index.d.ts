@@ -1,4 +1,5 @@
 
+
 export interface ImagePickerOption {
     imageCount: number,             // 最大选择图片数目，默认6
     isRecordSelected: boolean,   // 是否已选图片
@@ -117,3 +118,7 @@ export interface ImagePickerOption {
   export function openVideoPicker (options:Partial<ImagePickerOption>,callback:(err:null|string,photos:Array<SelectedPhoto>)=>void): void;
   export function asyncOpenVideoPicker (options:Partial<ImagePickerOption>): Promise<Array<SelectedPhoto>>;
 
+  export function openVideo (options:Partial<ImagePickerOption>,callback:(err:null|string,photos:Array<SelectedPhoto>)=>void): void;
+
+
+  export function asyncOpenVideo (options:Partial<ImagePickerOption>): Promise<Array<SelectedPhoto>>;
