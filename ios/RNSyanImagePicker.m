@@ -1,5 +1,6 @@
 
 
+
 #import "RNSyanImagePicker.h"
 
 #import "TZImageManager.h"
@@ -116,12 +117,32 @@ RCT_REMAP_METHOD(asyncOpenVideoPicker,
     [self openTZImagePicker:options callback:nil openVideoPickerResolver:resolve rejecter: reject];
 }
 
+RCT_EXPORT_METHOD(openVideo:(NSDictionary *)options callback:(RCTResponseSenderBlock)callback) {
+    self.cameraOptions = options;
+    self.callback = callback;
+    self.resolveBlock = nil;
+    self.rejectBlock = nil;
+    [self takeVideo];
+}
+
+RCT_REMAP_METHOD(asyncOpenVideo,
+                 options:(NSDictionary *)options
+                 openVideoResolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject) {
+  self.cameraOptions = options;
+  self.resolveBlock = resolve;
+  self.rejectBlock = reject;
+  self.callback = nil;
+  [self takeVideo];
+}
+
 
 
 - (void)openTZImagePicker:(NSDictionary *)options callback:(RCTResponseSenderBlock)callback
   openVideoPickerResolver:(RCTPromiseResolveBlock)resolve
                  rejecter:(RCTPromiseRejectBlock)reject
 {
+    NSLog(@"options: %@", options);
     NSInteger imageCount = [options sy_integerForKey:@"imageCount"];
     BOOL isCamera        = [options sy_boolForKey:@"isCamera"];
     BOOL isCrop          = [options sy_boolForKey:@"isCrop"];
@@ -138,7 +159,7 @@ RCT_REMAP_METHOD(asyncOpenVideoPicker,
     NSInteger CropW      = [options sy_integerForKey:@"CropW"];
     NSInteger CropH      = [options sy_integerForKey:@"CropH"];
     NSInteger circleCropRadius = [options sy_integerForKey:@"circleCropRadius"];
-    NSInteger videoMaximumDuration = [options sy_integerForKey:@"videoMaximumDuration"];
+    NSInteger videoMaximumDuration = [options sy_integerForKey:@"recordVideoSecond"];
     NSInteger   quality  = [self.cameraOptions sy_integerForKey:@"quality"];
 
     TZImagePickerController *imagePickerVc = [[TZImagePickerController alloc] initWithMaxImagesCount:imageCount delegate:self];
@@ -149,10 +170,11 @@ RCT_REMAP_METHOD(asyncOpenVideoPicker,
     imagePickerVc.allowPickingVideo = allowPickingVideo; // 不允许视频
     imagePickerVc.allowPickingImage = allowPickingImage;
     imagePickerVc.allowTakeVideo = allowTakeVideo; // 允许拍摄视频
-    imagePickerVc.videoMaximumDuration = videoMaximumDuration;
+    imagePickerVc.videoMaximumDuration = videoMaximumDuration; // 视频最大录制时间
+    
     imagePickerVc.allowPickingMultipleVideo = isGif || allowPickingMultipleVideo ? YES : NO;
     imagePickerVc.allowPickingOriginalPhoto = allowPickingOriginalPhoto; // 允许原图
-    imagePickerVc.sortAscendingByModificationDate = sortAscendingByModificationDate;
+    imagePickerVc.sortAscendingByModificationDate = NO;
     imagePickerVc.alwaysEnableDoneBtn = YES;
     imagePickerVc.allowCrop = isCrop;   // 裁剪
     imagePickerVc.autoDismiss = NO;
@@ -398,10 +420,28 @@ RCT_REMAP_METHOD(asyncOpenVideoPicker,
 - (void)pushVideoPickerController {
     UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypeCamera;
     if ([UIImagePickerController isSourceTypeAvailable: UIImagePickerControllerSourceTypeCamera]) {
+//        // 照片最大可选张数
+//        NSInteger imageCount = [self.cameraOptions sy_integerForKey:@"imageCount"];
+//        // 显示内部拍照按钮
+//        BOOL isCamera        = [self.cameraOptions sy_boolForKey:@"isCamera"];
+//        BOOL isCrop          = [self.cameraOptions sy_boolForKey:@"isCrop"];
+//        BOOL isGif           = [self.cameraOptions sy_boolForKey:@"isGif"];
+//        BOOL showCropCircle  = [self.cameraOptions sy_boolForKey:@"showCropCircle"];
+//        BOOL isRecordSelected = [self.cameraOptions sy_boolForKey:@"isRecordSelected"];
+//        BOOL allowPickingOriginalPhoto = [self.cameraOptions sy_boolForKey:@"allowPickingOriginalPhoto"];
+//        BOOL allowPickingMultipleVideo = [self.cameraOptions sy_boolForKey:@"allowPickingMultipleVideo"];
+//        BOOL sortAscendingByModificationDate = [self.cameraOptions sy_boolForKey:@"sortAscendingByModificationDate"];
+//        BOOL showSelectedIndex = [self.cameraOptions sy_boolForKey:@"showSelectedIndex"];
+//        NSInteger CropW      = [self.cameraOptions sy_integerForKey:@"CropW"];
+//        NSInteger CropH      = [self.cameraOptions sy_integerForKey:@"CropH"];
+//        NSInteger circleCropRadius = [self.cameraOptions sy_integerForKey:@"circleCropRadius"];
+//        NSInteger   quality  = [self.cameraOptions sy_integerForKey:@"quality"];
+        NSInteger recordVideoSecond = [self.cameraOptions sy_integerForKey:@"recordVideoSecond"];
         self.imagePickerVc.sourceType = sourceType;
         NSMutableArray *mediaTypes = [NSMutableArray array];
         [mediaTypes addObject:(NSString *)kUTTypeMovie];
         _imagePickerVc.mediaTypes = mediaTypes;
+        _imagePickerVc.videoMaximumDuration = recordVideoSecond;
         [[self topViewController] presentViewController:self.imagePickerVc animated:YES completion:nil];
     } else {
         NSLog(@"模拟器中无法打开照相机,请在真机中使用");
@@ -411,11 +451,10 @@ RCT_REMAP_METHOD(asyncOpenVideoPicker,
 - (void)imagePickerController:(UIImagePickerController*)picker didFinishPickingMediaWithInfo:(NSDictionary *)info {
     [picker dismissViewControllerAnimated:YES completion:^{
         NSString *type = [info objectForKey:UIImagePickerControllerMediaType];
+        TZImagePickerController *tzImagePickerVc = [[TZImagePickerController alloc] initWithMaxImagesCount:1 delegate:self];
+        tzImagePickerVc.sortAscendingByModificationDate = NO;
+        [tzImagePickerVc showProgressHUD];
         if ([type isEqualToString:@"public.image"]) {
-
-            TZImagePickerController *tzImagePickerVc = [[TZImagePickerController alloc] initWithMaxImagesCount:1 delegate:nil];
-            tzImagePickerVc.sortAscendingByModificationDate = NO;
-            [tzImagePickerVc showProgressHUD];
             UIImage *image = [info objectForKey:UIImagePickerControllerOriginalImage];
 
             // save photo and get asset / 保存图片，获取到asset
@@ -453,6 +492,33 @@ RCT_REMAP_METHOD(asyncOpenVideoPicker,
                     }
                 }
             }];
+        }else if([type isEqualToString:@"public.movie"]){
+            NSURL *videoUrl = [info objectForKey:UIImagePickerControllerMediaURL];
+            NSInteger   quality = [self.cameraOptions sy_integerForKey:@"quality"];
+            if (videoUrl) {
+                [[TZImageManager manager] saveVideoWithUrl:videoUrl location:nil completion:^(PHAsset *asset, NSError *error) {
+                    [tzImagePickerVc hideProgressHUD];
+                    if (!error) {
+                        TZAssetModel *assetModel = [[TZImageManager manager] createModelWithAsset:asset];
+                        [[TZImageManager manager] getPhotoWithAsset:assetModel.asset completion:^(UIImage *photo, NSDictionary *info, BOOL isDegraded) {
+                            if (!isDegraded && photo) {
+                                // 导出视频
+                                [[TZImageManager manager] getVideoOutputPathWithAsset:asset presetName:AVAssetExportPresetHighestQuality success:^(NSString *outputPath) {
+                                    NSLog(@"视频导出成功:%@", outputPath);
+                                    [self invokeSuccessWithResult:@[[self handleVideoData:outputPath asset:asset coverImage:photo quality:quality]]];
+                                    [tzImagePickerVc dismissViewControllerAnimated:YES completion:nil];
+                                    [tzImagePickerVc hideProgressHUD];
+                                } failure:^(NSString *errorMessage, NSError *error) {
+                                    NSLog(@"视频导出失败:%@,error:%@",errorMessage, error);
+                                    [self invokeError];
+                                    [tzImagePickerVc dismissViewControllerAnimated:YES completion:nil];
+                                    [tzImagePickerVc hideProgressHUD];
+                                }];
+                            }
+                        }];
+                    }
+                }];
+            }
         }
     }];
 }
@@ -665,3 +731,4 @@ RCT_REMAP_METHOD(asyncOpenVideoPicker,
 }
 
 @end
+
