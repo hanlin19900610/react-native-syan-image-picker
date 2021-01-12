@@ -1,4 +1,5 @@
 
+
 #import "RNSyanImagePicker.h"
 
 #import "TZImageManager.h"
@@ -6,6 +7,7 @@
 #import "TZImageCropManager.h"
 #import <AssetsLibrary/AssetsLibrary.h>
 #import <React/RCTUtils.h>
+#import <CoreServices/CoreServices.h>
 
 @interface RNSyanImagePicker ()
 
@@ -103,10 +105,23 @@ RCT_EXPORT_METHOD(removeAllPhoto) {
 
 // openVideoPicker
 RCT_EXPORT_METHOD(openVideoPicker:(NSDictionary *)options callback:(RCTResponseSenderBlock)callback) {
-    [self openTZImagePicker:options callback:callback];
+    [self openTZImagePicker:options callback:callback openVideoPickerResolver: nil rejecter: nil];
 }
 
-- (void)openTZImagePicker:(NSDictionary *)options callback:(RCTResponseSenderBlock)callback {
+RCT_REMAP_METHOD(asyncOpenVideoPicker,
+                 options:(NSDictionary *)options
+                 openVideoPickerResolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject) {
+  
+    [self openTZImagePicker:options callback:nil openVideoPickerResolver:resolve rejecter: reject];
+}
+
+
+
+- (void)openTZImagePicker:(NSDictionary *)options callback:(RCTResponseSenderBlock)callback
+  openVideoPickerResolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject
+{
     NSInteger imageCount = [options sy_integerForKey:@"imageCount"];
     BOOL isCamera        = [options sy_boolForKey:@"isCamera"];
     BOOL isCrop          = [options sy_boolForKey:@"isCrop"];
@@ -167,7 +182,11 @@ RCT_EXPORT_METHOD(openVideoPicker:(NSDictionary *)options callback:(RCTResponseS
     __weak TZImagePickerController *weakPicker = imagePickerVc;
     [imagePickerVc setDidFinishPickingPhotosWithInfosHandle:^(NSArray<UIImage *> *photos,NSArray *assets,BOOL isSelectOriginalPhoto,NSArray<NSDictionary *> *infos) {
         [self handleAssets:assets photos:photos quality:quality isSelectOriginalPhoto:isSelectOriginalPhoto completion:^(NSArray *selecteds) {
-            callback(@[[NSNull null], selecteds]);
+            if(callback != nil){
+                callback(@[[NSNull null], selecteds]);
+            }else{
+                resolve(selecteds);
+            }
             [weakPicker dismissViewControllerAnimated:YES completion:nil];
             [weakPicker hideProgressHUD];
         } fail:^(NSError *error) {
@@ -180,12 +199,22 @@ RCT_EXPORT_METHOD(openVideoPicker:(NSDictionary *)options callback:(RCTResponseS
         [weakPicker showProgressHUD];
         [[TZImageManager manager] getVideoOutputPathWithAsset:asset presetName:AVAssetExportPresetHighestQuality success:^(NSString *outputPath) {
             NSLog(@"视频导出成功:%@", outputPath);
-            callback(@[[NSNull null], @[[self handleVideoData:outputPath asset:asset coverImage:coverImage quality:quality]]]);
+            if(callback != nil){
+                callback(@[[NSNull null], @[[self handleVideoData:outputPath asset:asset coverImage:coverImage quality:quality]]]);
+            }else{
+                resolve(@[[self handleVideoData:outputPath asset:asset coverImage:coverImage quality:quality]]);
+            }
+            
             [weakPicker dismissViewControllerAnimated:YES completion:nil];
             [weakPicker hideProgressHUD];
         } failure:^(NSString *errorMessage, NSError *error) {
             NSLog(@"视频导出失败:%@,error:%@",errorMessage, error);
-            callback(@[@"视频导出失败"]);
+            if(callback != nil){
+                callback(@[@"视频导出失败"]);
+            }else{
+                reject(@"", @"视频导出失败", nil);
+            }
+            
             [weakPicker dismissViewControllerAnimated:YES completion:nil];
             [weakPicker hideProgressHUD];
         }];
@@ -193,7 +222,11 @@ RCT_EXPORT_METHOD(openVideoPicker:(NSDictionary *)options callback:(RCTResponseS
 
     __weak TZImagePickerController *weakPickerVc = imagePickerVc;
     [imagePickerVc setImagePickerControllerDidCancelHandle:^{
-        callback(@[@"取消"]);
+        if(callback != nil){
+            callback(@[@"取消"]);
+        }else{
+            reject(@"", @"取消", nil);
+        }
         [weakPicker dismissViewControllerAnimated:YES completion:nil];
         [weakPickerVc hideProgressHUD];
     }];
@@ -324,6 +357,51 @@ RCT_EXPORT_METHOD(openVideoPicker:(NSDictionary *)options callback:(RCTResponseS
     UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypeCamera;
     if ([UIImagePickerController isSourceTypeAvailable: UIImagePickerControllerSourceTypeCamera]) {
         self.imagePickerVc.sourceType = sourceType;
+        NSMutableArray *mediaTypes = [NSMutableArray array];
+        [mediaTypes addObject:(NSString *)kUTTypeImage];
+        _imagePickerVc.mediaTypes = mediaTypes;
+        [[self topViewController] presentViewController:self.imagePickerVc animated:YES completion:nil];
+    } else {
+        NSLog(@"模拟器中无法打开照相机,请在真机中使用");
+    }
+}
+
+- (void)takeVideo {
+    AVAuthorizationStatus authStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
+    if (authStatus == AVAuthorizationStatusRestricted || authStatus == AVAuthorizationStatusDenied) {
+        // 无相机权限 做一个友好的提示
+        UIAlertView * alert = [[UIAlertView alloc]initWithTitle:@"无法使用相机" message:@"请在iPhone的""设置-隐私-相机""中允许访问相机" delegate:self cancelButtonTitle:@"取消" otherButtonTitles:@"设置", nil];
+        [alert show];
+    } else if (authStatus == AVAuthorizationStatusNotDetermined) {
+        // fix issue 466, 防止用户首次拍照拒绝授权时相机页黑屏
+        [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL granted) {
+            if (granted) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [self takePhoto];
+                });
+            }
+        }];
+        // 拍照之前还需要检查相册权限
+    } else if ([PHPhotoLibrary authorizationStatus] == 2) { // 已被拒绝，没有相册权限，将无法保存拍的照片
+        UIAlertView * alert = [[UIAlertView alloc]initWithTitle:@"无法访问相册" message:@"请在iPhone的""设置-隐私-相册""中允许访问相册" delegate:self cancelButtonTitle:@"取消" otherButtonTitles:@"设置", nil];
+        [alert show];
+    } else if ([PHPhotoLibrary authorizationStatus] == 0) { // 未请求过相册权限
+        [[TZImageManager manager] requestAuthorizationWithCompletion:^{
+            [self takePhoto];
+        }];
+    } else {
+        [self pushVideoPickerController];
+    }
+}
+
+// 调用相机
+- (void)pushVideoPickerController {
+    UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypeCamera;
+    if ([UIImagePickerController isSourceTypeAvailable: UIImagePickerControllerSourceTypeCamera]) {
+        self.imagePickerVc.sourceType = sourceType;
+        NSMutableArray *mediaTypes = [NSMutableArray array];
+        [mediaTypes addObject:(NSString *)kUTTypeMovie];
+        _imagePickerVc.mediaTypes = mediaTypes;
         [[self topViewController] presentViewController:self.imagePickerVc animated:YES completion:nil];
     } else {
         NSLog(@"模拟器中无法打开照相机,请在真机中使用");
