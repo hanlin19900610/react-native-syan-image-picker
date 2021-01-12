@@ -115,4 +115,5 @@ export interface ImagePickerOption {
   export function removeAllPhoto (): void;
 
   export function openVideoPicker (options:Partial<ImagePickerOption>,callback:(err:null|string,photos:Array<SelectedPhoto>)=>void): void;
+  export function asyncOpenVideoPicker (options:Partial<ImagePickerOption>): Promise<Array<SelectedPhoto>>;
 
