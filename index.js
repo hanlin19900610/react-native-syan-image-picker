@@ -159,4 +159,23 @@ export default {
         };
         return RNSyanImagePicker.openVideoPicker(optionObj, callback)
     }
+    
+    asyncOpenVideoPicker(options) {
+        const optionObj = {
+            ...defaultOptions,
+            isCamera: false,
+            allowPickingGif: false,
+            allowPickingVideo: true,
+            allowPickingImage: false,
+            allowTakeVideo: true,
+            allowPickingMultipleVideo: imageCount > 1,
+            videoMaximumDuration: 20,
+            MaxSecond: 60,
+            MinSecond: 0,
+            recordVideoSecond: 60,
+            ...options,
+            imageCount
+        };
+        return RNSyanImagePicker.asyncOpenVideoPicker(optionObj);
+    },
 };
