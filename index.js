@@ -158,9 +158,10 @@ export default {
             imageCount
         };
         return RNSyanImagePicker.openVideoPicker(optionObj, callback)
-    }
-    
+    },
+
     asyncOpenVideoPicker(options) {
+        const imageCount = options.videoCount ? options.videoCount : 1
         const optionObj = {
             ...defaultOptions,
             isCamera: false,
@@ -169,13 +170,36 @@ export default {
             allowPickingImage: false,
             allowTakeVideo: true,
             allowPickingMultipleVideo: imageCount > 1,
-            videoMaximumDuration: 20,
-            MaxSecond: 60,
+            videoMaximumDuration: 10,
+            MaxSecond: 10,
             MinSecond: 0,
-            recordVideoSecond: 60,
+            recordVideoSecond: 10,
             ...options,
             imageCount
         };
         return RNSyanImagePicker.asyncOpenVideoPicker(optionObj);
     },
+    /**
+    * 打开相机支持裁剪参数
+    * @param options
+    * @param callback
+    */
+    openVideo(options, callback) {
+        const optionObj = {
+            ...defaultOptions,
+            ...options,
+            imageCount: 1
+        };
+        RNSyanImagePicker.openVideo(optionObj, callback)
+    },
+
+    asyncOpenVideo(options) {
+        const optionObj = {
+            ...defaultOptions,
+            ...options,
+            imageCount: 1
+        };
+        return RNSyanImagePicker.asyncOpenVideo(optionObj);
+    },
 };
+
