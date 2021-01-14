@@ -1,4 +1,5 @@
 
+
 package com.syanpicker;
 
 import android.app.Activity;
@@ -47,6 +48,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import top.zibin.luban.Luban;
 
 
 public class RNSyanImagePickerModule extends ReactContextBaseJavaModule {
@@ -216,7 +218,7 @@ public class RNSyanImagePickerModule extends ReactContextBaseJavaModule {
                 .imageFormat(isAndroidQ ? PictureMimeType.PNG_Q : PictureMimeType.PNG)// 拍照保存图片格式后缀,默认jpeg
                 .isZoomAnim(true)// 图片列表点击 缩放效果 默认true
                 .isEnableCrop(isCrop)// 是否裁剪 true or false
-                .isCompress(compress)// 是否压缩 true or false
+//                .isCompress(compress)// 是否压缩 true or false
                 .withAspectRatio(CropW, CropH)// int 裁剪比例 如16:9 3:2 3:4 1:1 可自定义
                 .hideBottomControls(isCrop)// 是否显示uCrop工具栏，默认不显示 true or false
                 .isGif(isGif)// 是否显示gif图片 true or false
@@ -263,7 +265,7 @@ public class RNSyanImagePickerModule extends ReactContextBaseJavaModule {
                 .imageEngine(GlideEngine.createGlideEngine())
                 .imageFormat(isAndroidQ ? PictureMimeType.PNG_Q : PictureMimeType.PNG)// 拍照保存图片格式后缀,默认jpeg
                 .isEnableCrop(isCrop)// 是否裁剪 true or false
-                .isCompress(compress)// 是否压缩 true or false
+//                .isCompress(compress)// 是否压缩 true or false
                 .withAspectRatio(CropW, CropH)// int 裁剪比例 如16:9 3:2 3:4 1:1 可自定义
                 .hideBottomControls(isCrop)// 是否显示uCrop工具栏，默认不显示 true or false
                 .freeStyleCropEnabled(freeStyleCropEnabled)// 裁剪框是否可拖拽 true or false
@@ -430,24 +432,29 @@ public class RNSyanImagePickerModule extends ReactContextBaseJavaModule {
         WritableArray imageList = new WritableNativeArray();
         boolean enableBase64 = cameraOptions.getBoolean("enableBase64");
 
-        for (LocalMedia media : tmpSelectList) {
-            imageList.pushMap(getImageResult(media, enableBase64));
+        try {
+            for (LocalMedia media : tmpSelectList) {
+                imageList.pushMap(getImageResult(media, enableBase64));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+
         invokeSuccessWithResult(imageList);
     }
 
-    private WritableMap getImageResult(LocalMedia media, Boolean enableBase64) {
+    private WritableMap getImageResult(LocalMedia media, Boolean enableBase64) throws IOException {
         WritableMap imageMap = new WritableNativeMap();
         String path = media.getPath();
-
-        if (media.isCompressed() || media.isCut()) {
-            path = media.getCompressPath();
-        }
-
-        if (media.isCut()) {
-            path = media.getCutPath();
-        }
         String filePath = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q  && path.startsWith("content://") ? uriToFileApiQ("image", Uri.parse(media.getPath()), ".jpg").getPath() : path;
+
+        List<File> files = Luban.with(getCurrentActivity())
+                .load(filePath)
+                .ignoreBy(100)
+                .setTargetDir(getCurrentActivity().getExternalCacheDir().getAbsolutePath())
+                .filter(path1 -> !(TextUtils.isEmpty(path1) || path1.toLowerCase().endsWith(".gif")))
+                .get();
+        filePath = files.get(0).getPath();
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
         BitmapFactory.decodeFile(filePath, options);
